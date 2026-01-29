@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:LiveAlert"
+             x:Class="LiveAlert.MainPage"
+             Title="LiveAlert Settings"
+             BackgroundColor="#000000">
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <local:EqualsConverter x:Key="EqualsConverter"/>
+            <Style TargetType="Label">
+                <Setter Property="TextColor"
+                        Value="White"/>
+            </Style>
+            <Style TargetType="Entry">
+                <Setter Property="TextColor"
+                        Value="White"/>
+                <Setter Property="BackgroundColor"
+                        Value="#000000"/>
+                <Setter Property="PlaceholderColor"
+                        Value="#888888"/>
+            </Style>
+            <Style TargetType="Picker">
+                <Setter Property="TextColor"
+                        Value="White"/>
+                <Setter Property="BackgroundColor"
+                        Value="#000000"/>
+            </Style>
+            <Style TargetType="RadioButton">
+                <Setter Property="TextColor"
+                        Value="White"/>
+                <Setter Property="BackgroundColor"
+                        Value="#000000"/>
+            </Style>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+    <ScrollView BackgroundColor="#000000">
+        <VerticalStackLayout Padding="16"
+                Spacing="12">
+            <Label Text="{Binding PermissionWarningMessage}"
+                    TextColor="Red"
+                    FontAttributes="Bold"
+                    HorizontalTextAlignment="Center"
+                    IsVisible="{Binding PermissionWarningVisible}"/>
+            <Label Text="デバッグモードON"
+                    BackgroundColor="#330000"
+                    TextColor="#FFCC00"
+                    FontAttributes="Bold"
+                    HorizontalTextAlignment="Center"
+                    IsVisible="{Binding DebugMode}"/>
+            <Label Text="{Binding WarningMessage}"
+                    TextColor="Red"
+                    FontAttributes="Bold"
+                    IsVisible="{Binding ShowWarning}"/>
+            <Label Text="youtubeの監視のためには、監視サービスを常駐させます。"
+                    FontAttributes="Bold"/>
+            <HorizontalStackLayout Spacing="12">
+                <Label Text="youtube監視常駐ON/OFF"
+                        VerticalOptions="Center"/>
+                <Switch IsToggled="{Binding ServiceRunning}"
+                        Toggled="OnServiceToggled"/>
+            </HorizontalStackLayout>
+
+            <BoxView HeightRequest="1"
+                    Color="#333"/>
+
+            <Label Text="通知"
+                    FontAttributes="Bold"/>
+            <Picker SelectedItem="{Binding NotificationMode}">
+                <Picker.Items>
+                    <x:String>アラーム</x:String>
+                    <x:String>マナー</x:String>
+                    <x:String>OFF</x:String>
+                </Picker.Items>
+            </Picker>
+
+            <Label Text="画面表示"
+                    FontAttributes="Bold"/>
+            <Picker SelectedItem="{Binding DisplayMode}">
+                <Picker.Items>
+                    <x:String>アラーム</x:String>
+                    <x:String>マナー</x:String>
+                    <x:String>OFF</x:String>
+                </Picker.Items>
+            </Picker>
+
+            <Label Text="音声再生"
+                    FontAttributes="Bold"/>
+            <Picker SelectedItem="{Binding AudioMode}">
+                <Picker.Items>
+                    <x:String>アラーム</x:String>
+                    <x:String>マナー</x:String>
+                    <x:String>OFF</x:String>
+                </Picker.Items>
+            </Picker>
+
+            <Label Text="{Binding PollIntervalSec, StringFormat='監視ポーリング間隔（秒）: {0}'}"/>
+            <Slider Minimum="60"
+                    Maximum="600"
+                    Value="{Binding PollIntervalSec}"
+                    HorizontalOptions="FillAndExpand"/>
+
+            <Label Text="{Binding DedupeMinutes, StringFormat='X Space 重複通知抑止（分）: {0}'}"/>
+            <Slider Minimum="1"
+                    Maximum="30"
+                    Value="{Binding DedupeMinutes}"
+                    HorizontalOptions="FillAndExpand"/>
+
+            <Label Text="{Binding MaxAlarmDurationSec, StringFormat='最大鳴動時間（秒）: {0}'}"/>
+            <Slider Minimum="15"
+                    Maximum="600"
+                    Value="{Binding MaxAlarmDurationSec}"
+                    HorizontalOptions="FillAndExpand"/>
+
+            <Label Text="{Binding LoopIntervalSec, StringFormat='音声ループ時のウェイト（秒）: {0}'}"/>
+            <Slider Minimum="0"
+                    Maximum="60"
+                    Value="{Binding LoopIntervalSec}"
+                    HorizontalOptions="FillAndExpand"/>
+
+            <Label Text="アラーム帯の位置"/>
+            <Picker SelectedItem="{Binding BandPosition}">
+                <Picker.Items>
+                    <x:String>画面上部</x:String>
+                    <x:String>画面中央</x:String>
+                    <x:String>画面下部</x:String>
+                </Picker.Items>
+            </Picker>
+
+            <Label Text="{Binding BandHeightPx, StringFormat='アラーム帯の高さ（px）: {0}'}"/>
+            <Slider Minimum="{Binding BandHeightMinPx}"
+                    Maximum="{Binding BandHeightMaxPx}"
+                    Value="{Binding BandHeightPx}"
+                    DragStarted="OnBandHeightDragStarted"
+                    DragCompleted="OnBandHeightDragCompleted"/>
+
+            <BoxView HeightRequest="1"
+                    Color="#333"/>
+
+            <Label Text="監視対象設定"
+                    FontAttributes="Bold"/>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Alerts}"
+                    Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Frame BorderColor="#555"
+                                BackgroundColor="#000000"
+                                Padding="10"
+                                Margin="0,0,0,6">
+                            <VerticalStackLayout Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto"
+                                        Padding="4">
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnAlertHeaderTapped"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid.GestureRecognizers>
+                                    <Label Text="{Binding DisplayLabel}"
+                                            FontAttributes="Bold"/>
+                                    <Label Grid.Column="1"
+                                            Text="詳細"
+                                            FontSize="12"
+                                            VerticalOptions="Center"/>
+                                </Grid>
+
+                                <BoxView HeightRequest="1"
+                                        Color="#333"/>
+
+                                <VerticalStackLayout Spacing="6"
+                                        IsVisible="{Binding IsExpanded}">
+                                    <Label Text="サービス"/>
+                                    <Picker SelectedItem="{Binding Service}">
+                                        <Picker.Items>
+                                            <x:String>youtube</x:String>
+                                            <x:String>x_space</x:String>
+                                        </Picker.Items>
+                                    </Picker>
+
+                                    <Label Text="URL"
+                                            IsVisible="{Binding Service, Converter={StaticResource EqualsConverter}, ConverterParameter=youtube}"/>
+                                    <Entry Text="{Binding Url}"
+                                            IsVisible="{Binding Service, Converter={StaticResource EqualsConverter}, ConverterParameter=youtube}"/>
+
+                                    <Label Text="通知アカウント名（表示名）"
+                                            IsVisible="{Binding Service, Converter={StaticResource EqualsConverter}, ConverterParameter=x_space}"/>
+                                    <Entry Text="{Binding TitleContains}"
+                                            IsVisible="{Binding Service, Converter={StaticResource EqualsConverter}, ConverterParameter=x_space}"/>
+
+                                    <Label Text="監視名"/>
+                                    <Entry Text="{Binding Label}"/>
+
+                                    <Label Text="メッセージ（{label}は監視名に置換されます）"/>
+                                    <Entry Text="{Binding Message}"/>
+
+                                    <Label Text="音声ファイル"/>
+                                    <Grid ColumnDefinitions="*,Auto"
+                                            ColumnSpacing="8">
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnVoicePathTapped"
+                                                    CommandParameter="{Binding .}"/>
+                                        </Grid.GestureRecognizers>
+                                        <Entry Grid.Column="0"
+                                                Text="{Binding Voice}"
+                                                IsReadOnly="True"
+                                                InputTransparent="True"
+                                                HorizontalOptions="FillAndExpand"
+                                                MinimumWidthRequest="160">
+                                        </Entry>
+                                        <Button Grid.Column="1"
+                                                Text="選択"
+                                                Clicked="OnPickVoiceClicked"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+                                    <Label Text="音声の音量"/>
+                                    <Grid ColumnDefinitions="*,Auto"
+                                            ColumnSpacing="8">
+                                        <Slider Grid.Column="0"
+                                                Minimum="0"
+                                                Maximum="100"
+                                                Value="{Binding VoiceVolume}"
+                                                HorizontalOptions="FillAndExpand"/>
+                                        <Button Grid.Column="1"
+                                                Text="テスト再生"
+                                                Clicked="OnTestVoiceClicked"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+
+                                    <Label Text="BGM ファイル"/>
+                                    <Grid ColumnDefinitions="*,Auto"
+                                            ColumnSpacing="8">
+                                        <Grid.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnBgmPathTapped"
+                                                    CommandParameter="{Binding .}"/>
+                                        </Grid.GestureRecognizers>
+                                        <Entry Grid.Column="0"
+                                                Text="{Binding Bgm}"
+                                                IsReadOnly="True"
+                                                InputTransparent="True"
+                                                HorizontalOptions="FillAndExpand"
+                                                MinimumWidthRequest="160">
+                                        </Entry>
+                                        <Button Grid.Column="1"
+                                                Text="選択"
+                                                Clicked="OnPickBgmClicked"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+                                    <Label Text="BGMの音量"/>
+                                    <Grid ColumnDefinitions="*,Auto"
+                                            ColumnSpacing="8">
+                                        <Slider Grid.Column="0"
+                                                Minimum="0"
+                                                Maximum="100"
+                                                Value="{Binding BgmVolume}"
+                                                HorizontalOptions="FillAndExpand"/>
+                                        <Button Grid.Column="1"
+                                                Text="テスト再生"
+                                                Clicked="OnTestBgmClicked"
+                                                CommandParameter="{Binding .}"/>
+                                    </Grid>
+
+                                    <Label Text="背景色"/>
+                                    <local:ColorPickerView SelectedColor="{Binding BackgroundColorValue}"/>
+
+                                    <Label Text="文字色"/>
+                                    <local:ColorPickerView SelectedColor="{Binding TextColorValue}"/>
+
+                                    <Button Text="削除"
+                                            Clicked="OnRemoveAlertClicked"
+                                            CommandParameter="{Binding .}"/>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </Frame>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            <Button Text="監視対象を追加"
+                    Clicked="OnAddAlertClicked"/>
+
+            <Button Text="ログ出力"
+                    Clicked="OnShowLogClicked"/>
+            <Button Text="権限設定"
+                    Clicked="OnPermissionSettingsClicked"/>
+            <Button x:Name="TestAlertButton"
+                    Text="テスト発報"
+                    Clicked="OnTestAlertClicked"
+                    IsVisible="False"/>
+            <Button Text="このプログラムについて"
+                    Clicked="OnAboutProgramClicked"/>
+            <Button Text="外部ライセンス"
+                    Clicked="OnFontLicenseClicked"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
