@@ -1,7 +1,7 @@
-using System.Windows.Media;
-using LiveAlert.Core;
-using System.Windows.Threading;
 using System.IO;
+using LiveAlert.Core;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 namespace LiveAlert.Windows.Services;
 
@@ -44,11 +44,14 @@ public sealed class AlertAudioPlayer : IDisposable
 
     private sealed class LoopingTrack
     {
-        private MediaPlayer? _player;
-        private DispatcherTimer? _restartTimer;
+        private IWavePlayer? _player;
+        private IDisposable? _reader;
+        private IDisposable? _ownedStream;
+        private CancellationTokenSource? _restartCts;
         private Uri? _source;
-        private double _volume;
+        private float _volume;
         private int _loopIntervalSec;
+        private bool _stopRequested;
 
         public void Start(Uri? sourceUri, double volume, int loopIntervalSec)
         {
@@ -60,84 +63,137 @@ public sealed class AlertAudioPlayer : IDisposable
             Stop();
 
             _source = sourceUri;
-            _volume = Math.Clamp(volume / 100d, 0d, 1d);
+            _volume = (float)Math.Clamp(volume / 100d, 0d, 1d);
             _loopIntervalSec = Math.Max(0, loopIntervalSec);
-            _player = new MediaPlayer();
-            _player.MediaEnded += HandleMediaEnded;
-            _player.MediaFailed += HandleMediaFailed;
-            _player.Open(_source);
-            _player.Volume = _volume;
-            _player.Play();
+            _stopRequested = false;
+            StartPlayback();
         }
 
         public void Stop()
         {
-            if (_restartTimer is not null)
+            _stopRequested = true;
+            _restartCts?.Cancel();
+            _restartCts?.Dispose();
+            _restartCts = null;
+            DisposePlayback();
+        }
+
+        private void StartPlayback()
+        {
+            if (_source is null)
             {
-                _restartTimer.Stop();
-                _restartTimer.Tick -= HandleRestartTick;
-                _restartTimer = null;
+                return;
             }
 
-            if (_player is not null)
+            try
             {
-                _player.MediaEnded -= HandleMediaEnded;
-                _player.MediaFailed -= HandleMediaFailed;
-                _player.Stop();
-                _player.Close();
-                _player = null;
+                DisposePlayback();
+
+                var playbackResource = CreatePlaybackResource(_source, _volume);
+                _reader = playbackResource.Reader;
+                _ownedStream = playbackResource.OwnedStream;
+                _player = new WaveOutEvent();
+                _player.PlaybackStopped += HandlePlaybackStopped;
+                _player.Init(playbackResource.Provider);
+                _player.Play();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Warn($"Audio playback failed: {ex.Message}");
+                Stop();
             }
         }
 
-        private void HandleMediaEnded(object? sender, EventArgs e)
+        private void HandlePlaybackStopped(object? sender, StoppedEventArgs e)
         {
-            if (_player is null)
+            var failed = e.Exception;
+            DisposePlayback();
+
+            if (_stopRequested)
             {
+                return;
+            }
+
+            if (failed is not null)
+            {
+                AppLog.Warn($"Audio playback failed: {failed.Message}");
+                Stop();
                 return;
             }
 
             if (_loopIntervalSec == 0)
             {
-                RestartPlayback();
+                StartPlayback();
                 return;
             }
 
-            _restartTimer = new DispatcherTimer
+            _restartCts?.Cancel();
+            _restartCts?.Dispose();
+            _restartCts = new CancellationTokenSource();
+            var token = _restartCts.Token;
+            _ = Task.Run(async () =>
             {
-                Interval = TimeSpan.FromSeconds(_loopIntervalSec)
-            };
-            _restartTimer.Tick += HandleRestartTick;
-            _restartTimer.Start();
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(_loopIntervalSec), token).ConfigureAwait(false);
+                    if (!token.IsCancellationRequested && !_stopRequested)
+                    {
+                        StartPlayback();
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }, token);
         }
 
-        private void HandleRestartTick(object? sender, EventArgs e)
+        private void DisposePlayback()
         {
-            if (_restartTimer is not null)
+            if (_player is not null)
             {
-                _restartTimer.Stop();
-                _restartTimer.Tick -= HandleRestartTick;
-                _restartTimer = null;
+                _player.PlaybackStopped -= HandlePlaybackStopped;
+                _player.Stop();
+                _player.Dispose();
+                _player = null;
             }
 
-            RestartPlayback();
+            _reader?.Dispose();
+            _reader = null;
+
+            _ownedStream?.Dispose();
+            _ownedStream = null;
         }
 
-        private void RestartPlayback()
+        private static PlaybackResource CreatePlaybackResource(Uri sourceUri, float volume)
         {
-            if (_player is null)
+            if (sourceUri.IsFile)
             {
-                return;
+                var reader = new AudioFileReader(sourceUri.LocalPath);
+                var volumeProvider = new VolumeSampleProvider(reader) { Volume = volume };
+                return new PlaybackResource(reader, new SampleToWaveProvider(volumeProvider), null);
             }
 
-            _player.Position = TimeSpan.Zero;
-            _player.Volume = _volume;
-            _player.Play();
+            var stream = AppAssets.OpenResourceStream(sourceUri);
+            try
+            {
+                var extension = Path.GetExtension(sourceUri.AbsolutePath).ToLowerInvariant();
+                WaveStream reader = extension switch
+                {
+                    ".wav" => new WaveFileReader(stream),
+                    ".mp3" => new StreamMediaFoundationReader(stream),
+                    _ => throw new NotSupportedException($"Unsupported embedded audio format: {extension}")
+                };
+
+                var volumeProvider = new VolumeSampleProvider(reader.ToSampleProvider()) { Volume = volume };
+                return new PlaybackResource(reader, new SampleToWaveProvider(volumeProvider), stream);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
         }
 
-        private void HandleMediaFailed(object? sender, ExceptionEventArgs e)
-        {
-            AppLog.Warn($"Audio playback failed: {e.ErrorException.Message}");
-            Stop();
-        }
+        private sealed record PlaybackResource(IDisposable Reader, IWaveProvider Provider, IDisposable? OwnedStream);
     }
 }

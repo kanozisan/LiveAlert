@@ -142,6 +142,7 @@
 - 2026-03-08: Windows 埋め込みアセット読込の `Application` 曖昧参照を解消し、`AppAssets` のビルドエラーを修正した。
 - 2026-03-08: Windows 配布方式を Visual Studio Installer Projects から Inno Setup へ切り替えた。`vdproj` を外し、`framework-dependent publish -> scripts/package_windows.ps1 -> installer/LiveAlert.Windows.iss` で `setup.exe` を作る構成にした。
 - 2026-03-08: Windows インストーラに `.NET 8 Desktop Runtime` の自動検出・ダウンロード・サイレント導入を追加した。未導入時は Microsoft の `aka.ms` 配布 URL を使う。
+- 2026-03-08: Windows の既定音源再生を WPF `MediaPlayer` から NAudio ベースへ切り替え、埋め込み resource の WAV/MP3 を stream から直接再生できるようにした。
 
 ## 未完了
 - Windows 設定 UI に色プレビュー以外の入力補助（プリセット、最近使った色など）はまだない。

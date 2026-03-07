@@ -21,14 +21,20 @@ public static class AppAssets
 
     public static string ReadText(Uri resourceUri)
     {
+        using var stream = OpenResourceStream(resourceUri);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    public static Stream OpenResourceStream(Uri resourceUri)
+    {
         var streamInfo = System.Windows.Application.GetResourceStream(resourceUri);
         if (streamInfo?.Stream is null)
         {
             throw new FileNotFoundException($"Embedded resource not found: {resourceUri}");
         }
 
-        using var reader = new StreamReader(streamInfo.Stream);
-        return reader.ReadToEnd();
+        return streamInfo.Stream;
     }
 
     private static Uri CreateResourceUri(string relativePath)

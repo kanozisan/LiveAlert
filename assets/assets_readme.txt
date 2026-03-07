@@ -1,5 +1,10 @@
 【使用素材について】
 
+■ライブラリ
+NAudio
+Copyright 2020 Mark Heath
+MIT License
+
 ■音声
 東北きりたん by AHS
 
