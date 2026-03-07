@@ -10,20 +10,7 @@ YouTube のライブ開始をポーリングで検知し、警告帯と音声/BG
 
 ## 対応プラットフォーム
 - Android: YouTube + X Space
-- Windows (WPF): YouTube のみ
-
-## かんたん設定（Windows）
-1) `src/LiveAlert.Windows` をビルドして起動  
-2) タスクトレイ常駐した状態で設定ウィンドウから YouTube URL を登録  
-3) ウィンドウを閉じても監視は継続  
-4) ロック中は音声のみ、ログオン中は帯も表示
-5) `アラーム停止` / `テスト発報` / `設定フォルダ` / `このプログラムについて` / `外部ライセンス` はタスクトレイ右クリックメニューから使う
-
-## Windows 配布
-- Windows 版のインストーラは Inno Setup を使う
-- `scripts/package_windows.ps1` で `framework-dependent` の publish とインストーラ生成をまとめて実行できる
-- 生成物は `installer/output` に出る
-- 配布先に `.NET 8 Desktop Runtime` が無い場合、インストーラが Microsoft の配布 URL から自動取得して導入する
+- Windows (.NET8): YouTube のみ
 
 ## かんたん設定（Android）
 1) インストールして起動  
@@ -52,7 +39,7 @@ YouTube のライブ開始をポーリングで検知し、警告帯と音声/BG
 - USE_FULL_SCREEN_INTENT
 
 ## ライセンス
-- MITライセンス（詳細は `assets/readme_android.txt` を参照）
+- MITライセンス
 
 ## 変更履歴
 
