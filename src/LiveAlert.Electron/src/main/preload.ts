@@ -15,19 +15,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importConfig: () => ipcRenderer.invoke('import-config'),
 
   onTestAlert: (callback: () => void) => {
-    ipcRenderer.on('test-alert', () => callback());
-    return () => { ipcRenderer.removeAllListeners('test-alert'); };
+    const handler = () => callback();
+    ipcRenderer.on('test-alert', handler);
+    return () => { ipcRenderer.removeListener('test-alert', handler); };
   },
   onShowAlert: (callback: (data: any) => void) => {
-    ipcRenderer.on('show-alert', (_event, data) => callback(data));
-    return () => { ipcRenderer.removeAllListeners('show-alert'); };
+    const handler = (_event: any, data: any) => callback(data);
+    ipcRenderer.on('show-alert', handler);
+    return () => { ipcRenderer.removeListener('show-alert', handler); };
   },
   onStatusUpdate: (callback: (data: any) => void) => {
-    ipcRenderer.on('status-update', (_event, data) => callback(data));
-    return () => { ipcRenderer.removeAllListeners('status-update'); };
+    const handler = (_event: any, data: any) => callback(data);
+    ipcRenderer.on('status-update', handler);
+    return () => { ipcRenderer.removeListener('status-update', handler); };
   },
   onPlayAudio: (callback: (data: any) => void) => {
-    ipcRenderer.on('play-audio', (_event, data) => callback(data));
-    return () => { ipcRenderer.removeAllListeners('play-audio'); };
+    const handler = (_event: any, data: any) => callback(data);
+    ipcRenderer.on('play-audio', handler);
+    return () => { ipcRenderer.removeListener('play-audio', handler); };
   },
 });

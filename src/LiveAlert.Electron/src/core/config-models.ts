@@ -4,6 +4,7 @@ export interface ConfigRoot {
 }
 
 export interface AlertConfig {
+  id?: string;
   service?: string;
   url: string;
   titleContains: string;
@@ -42,7 +43,7 @@ export function createDefaultConfig(): ConfigRoot {
     alerts: [
       {
         service: 'youtube',
-        url: 'https://www.youtube.com/channel/XXXX',
+        url: '',
         titleContains: '',
         label: 'SAMPLE',
         voice: '',
@@ -75,8 +76,14 @@ export function createDefaultOptions(): AlertOptions {
   };
 }
 
+let alertIdCounter = 0;
+function generateAlertId(): string {
+  return `alert-${Date.now()}-${++alertIdCounter}`;
+}
+
 export function createDefaultAlert(): AlertConfig {
   return {
+    id: generateAlertId(),
     service: 'youtube',
     url: '',
     titleContains: '',

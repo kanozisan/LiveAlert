@@ -39,7 +39,7 @@ export function SettingsPanel({ options, onChange }: Props) {
           <label>バンド位置</label>
           <select
             value={options.bandPosition}
-            onChange={(e) => update({ bandPosition: e.target.value as any })}
+            onChange={(e) => update({ bandPosition: e.target.value as AlertOptions['bandPosition'] })}
           >
             <option value="top">上</option>
             <option value="center">中央</option>
@@ -62,7 +62,7 @@ export function SettingsPanel({ options, onChange }: Props) {
           <label>表示モード</label>
           <select
             value={options.displayMode}
-            onChange={(e) => update({ displayMode: e.target.value as any })}
+            onChange={(e) => update({ displayMode: e.target.value as AlertOptions['displayMode'] })}
           >
             <option value="alarm">バンド表示</option>
             <option value="notification">OS通知</option>
@@ -74,7 +74,7 @@ export function SettingsPanel({ options, onChange }: Props) {
           <label>音声モード</label>
           <select
             value={options.audioMode}
-            onChange={(e) => update({ audioMode: e.target.value as any })}
+            onChange={(e) => update({ audioMode: e.target.value as AlertOptions['audioMode'] })}
           >
             <option value="alarm">アラーム</option>
             <option value="manner">マナー</option>

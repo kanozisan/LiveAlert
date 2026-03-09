@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, dialog, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, dialog, Notification, screen } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import { AlertMonitor, AlertEvent, MonitoringSummary, MonitoringFailure } from '../core/alert-monitor';
 import { AlertQueue, AlertQueueItem } from '../core/alert-queue';
 import { ConfigRoot, createDefaultConfig } from '../core/config-models';
@@ -8,6 +9,7 @@ import { ConfigRoot, createDefaultConfig } from '../core/config-models';
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let isQuitting = false;
 
 const isDev = !app.isPackaged;
 app.setName('LiveAlert');
@@ -82,7 +84,7 @@ function createMainWindow(): void {
   });
 
   mainWindow.on('close', (e) => {
-    if (!(app as any).isQuitting) {
+    if (!isQuitting) {
       e.preventDefault();
       mainWindow?.hide();
       // Hide from Dock when window is closed (macOS menu bar app pattern)
@@ -102,7 +104,6 @@ function showMainWindow(): void {
 }
 
 function createOverlayWindow(bandHeightPx: number, bandPosition: string): BrowserWindow {
-  const { screen } = require('electron');
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
   const bandHeight = Math.min(bandHeightPx, Math.floor(screenHeight * 0.5));
@@ -154,8 +155,6 @@ function createTray(): void {
     ? path.resolve(__dirname, '../../resources')
     : path.join(process.resourcesPath, 'resources');
   const iconPath = path.join(resourcesDir, 'tray-iconTemplate.png');
-  const icon2xPath = path.join(resourcesDir, 'tray-iconTemplate@2x.png');
-
   let icon: Electron.NativeImage;
   if (fs.existsSync(iconPath)) {
     icon = nativeImage.createFromPath(iconPath);
@@ -174,7 +173,7 @@ function createTray(): void {
     { type: 'separator' },
     { label: '設定フォルダを開く', click: () => { shell.openPath(getConfigDir()); } },
     { type: 'separator' },
-    { label: '終了', click: () => { (app as any).isQuitting = true; app.quit(); } },
+    { label: '終了', click: () => { isQuitting = true; app.quit(); } },
   ]);
 
   tray.setToolTip('LiveAlert - 監視中');
@@ -236,6 +235,7 @@ function stopCurrentAlert(openTarget: boolean): void {
   }
 
   const targetUrl = openTarget && currentItem && !isSampleAlert(currentItem.alert.label)
+      && /^[\w-]{11}$/.test(currentItem.videoId)
     ? `https://www.youtube.com/watch?v=${currentItem.videoId}`
     : null;
 
@@ -266,13 +266,16 @@ function processQueue(): void {
   sendToRenderer('status-update', { currentAlert: label });
   tray?.setToolTip(`LiveAlert - アラート: ${label}`);
 
-  // Audio: send to renderer for playback via Web Audio
-  sendToRenderer('play-audio', {
-    voice: next.alert.voice,
-    voiceVolume: next.alert.voiceVolume,
-    bgm: next.alert.bgm,
-    bgmVolume: next.alert.bgmVolume,
-  });
+  // Audio: send to renderer for playback via Web Audio (respect audioMode)
+  const audioMode = currentConfig.options.audioMode;
+  if (audioMode !== 'off') {
+    sendToRenderer('play-audio', {
+      voice: next.alert.voice,
+      voiceVolume: audioMode === 'manner' ? 0 : next.alert.voiceVolume,
+      bgm: next.alert.bgm,
+      bgmVolume: audioMode === 'manner' ? 0 : next.alert.bgmVolume,
+    });
+  }
 
   // Show alert based on display mode
   const displayMode = currentConfig.options.displayMode;
@@ -352,20 +355,28 @@ ipcMain.handle('get-config-dir', () => getConfigDir());
 
 ipcMain.handle('read-config', async () => {
   const configPath = getConfigPath();
-  if (!fs.existsSync(configPath)) return null;
-  return fs.readFileSync(configPath, 'utf-8');
+  try {
+    return await fsp.readFile(configPath, 'utf-8');
+  } catch {
+    return null;
+  }
 });
 
 ipcMain.handle('write-config', async (_event, json: string) => {
-  fs.writeFileSync(getConfigPath(), json, 'utf-8');
-  // Hot reload config into monitor
   try {
-    currentConfig = JSON.parse(json) as ConfigRoot;
-  } catch { /* ignore */ }
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed.alerts) || !parsed.options) {
+      return;
+    }
+    await fsp.writeFile(getConfigPath(), json, 'utf-8');
+    currentConfig = parsed as ConfigRoot;
+  } catch { /* invalid JSON, ignore */ }
 });
 
 ipcMain.handle('open-url', async (_event, url: string) => {
-  shell.openExternal(url);
+  if (typeof url === 'string' && /^https:\/\/(www\.)?youtube\.com\//i.test(url)) {
+    shell.openExternal(url);
+  }
 });
 
 ipcMain.handle('show-overlay', async (_event, alertData: any) => {
@@ -393,15 +404,16 @@ ipcMain.handle('test-alert', async () => {
 
 // --- Config import/export ---
 ipcMain.handle('export-config', async () => {
-  const result = await dialog.showSaveDialog(mainWindow!, {
+  if (!mainWindow) return { success: false, error: 'ウィンドウが存在しません' };
+  const result = await dialog.showSaveDialog(mainWindow, {
     title: '設定のエクスポート',
     defaultPath: 'config.json',
     filters: [{ name: 'JSON', extensions: ['json'] }],
   });
   if (result.canceled || !result.filePath) return { success: false };
   try {
-    const configJson = fs.readFileSync(getConfigPath(), 'utf-8');
-    fs.writeFileSync(result.filePath, configJson, 'utf-8');
+    const configJson = await fsp.readFile(getConfigPath(), 'utf-8');
+    await fsp.writeFile(result.filePath, configJson, 'utf-8');
     return { success: true };
   } catch (e: any) {
     return { success: false, error: e.message };
@@ -409,19 +421,20 @@ ipcMain.handle('export-config', async () => {
 });
 
 ipcMain.handle('import-config', async () => {
-  const result = await dialog.showOpenDialog(mainWindow!, {
+  if (!mainWindow) return { success: false, error: 'ウィンドウが存在しません' };
+  const result = await dialog.showOpenDialog(mainWindow, {
     title: '設定のインポート',
     filters: [{ name: 'JSON', extensions: ['json'] }],
     properties: ['openFile'],
   });
   if (result.canceled || result.filePaths.length === 0) return { success: false };
   try {
-    const json = fs.readFileSync(result.filePaths[0], 'utf-8');
+    const json = await fsp.readFile(result.filePaths[0], 'utf-8');
     const parsed = JSON.parse(json);
-    if (!parsed.alerts || !parsed.options) {
+    if (!Array.isArray(parsed.alerts) || !parsed.options) {
       return { success: false, error: '無効な設定ファイルです' };
     }
-    fs.writeFileSync(getConfigPath(), json, 'utf-8');
+    await fsp.writeFile(getConfigPath(), json, 'utf-8');
     currentConfig = parsed as ConfigRoot;
     return { success: true, config: json };
   } catch (e: any) {
@@ -454,6 +467,6 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
-  (app as any).isQuitting = true;
+  isQuitting = true;
   monitor.stop();
 });

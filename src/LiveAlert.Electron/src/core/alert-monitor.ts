@@ -30,7 +30,7 @@ interface AlertRuntimeState {
 export class AlertMonitor extends EventEmitter {
   private youtube = new YouTubeLiveDetector();
   private state = new Map<number, AlertRuntimeState>();
-  private notifiedVideoIds = new Set<string>();
+  private notifiedVideoIds = new Map<string, number>(); // videoId -> timestamp
   private running = false;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -53,13 +53,19 @@ export class AlertMonitor extends EventEmitter {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
     }
-    this.youtube.cancel();
   }
 
   private async poll(): Promise<void> {
     if (!this.running) return;
 
     const config = this.getConfig();
+    // Cleanup old notified IDs based on dedupeMinutes setting
+    const dedupeMs = Math.max(1, config.options.dedupeMinutes || 5) * 60 * 1000;
+    const cutoff = Date.now() - dedupeMs;
+    for (const [id, ts] of this.notifiedVideoIds) {
+      if (ts < cutoff) this.notifiedVideoIds.delete(id);
+    }
+
     const results: { isError: boolean; isLive: boolean; label: string }[] = [];
 
     const promises = config.alerts.map(async (alert, index) => {
@@ -122,7 +128,7 @@ export class AlertMonitor extends EventEmitter {
       const videoId = liveResult.videoId;
       if (!this.notifiedVideoIds.has(videoId)) {
         if (!liveResult.videoId.startsWith('debug:')) {
-          this.notifiedVideoIds.add(videoId);
+          this.notifiedVideoIds.set(videoId, Date.now());
         }
         state.currentLiveVideoId = videoId;
         this.emit('alert', {

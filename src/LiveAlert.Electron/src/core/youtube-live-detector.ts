@@ -12,11 +12,12 @@ const INITIAL_DATA_REGEX = /var ytInitialData\s*=\s*(\{.*?\});/s;
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 export class YouTubeLiveDetector {
-  private abortController: AbortController | null = null;
-
   async checkLive(alert: AlertConfig, signal?: AbortSignal): Promise<LiveCheckResult> {
     try {
       const url = alert.url.trim();
+      if (!url || !url.startsWith('https://')) {
+        return { isLive: false, isError: false };
+      }
       if (url.includes('watch?v=')) {
         const videoId = extractVideoIdFromUrl(url);
         if (!videoId) return { isLive: false, isError: false };
@@ -48,10 +49,6 @@ export class YouTubeLiveDetector {
       if (e.name === 'AbortError') throw e;
       return { isLive: false, isError: true, errorMessage: e.message };
     }
-  }
-
-  cancel(): void {
-    this.abortController?.abort();
   }
 
   private async checkWatchPage(videoId: string, signal?: AbortSignal): Promise<LiveCheckResult> {
@@ -120,23 +117,25 @@ function extractLiveVideoId(html?: string): string | null {
   }
 }
 
-function findLiveVideoId(element: any): string | null {
-  if (element === null || element === undefined) return null;
+function findLiveVideoId(element: any, depth = 0): string | null {
+  if (depth > 30 || element === null || element === undefined) return null;
   if (Array.isArray(element)) {
     for (const item of element) {
-      const found = findLiveVideoId(item);
+      const found = findLiveVideoId(item, depth + 1);
       if (found) return found;
     }
     return null;
   }
   if (typeof element === 'object') {
-    if (element.videoId && typeof element.videoId === 'string' && Array.isArray(element.thumbnailOverlays)) {
+    if (element.videoId && typeof element.videoId === 'string'
+        && /^[\w-]{11}$/.test(element.videoId)
+        && Array.isArray(element.thumbnailOverlays)) {
       if (hasLiveOverlay(element.thumbnailOverlays)) {
         return element.videoId;
       }
     }
     for (const key of Object.keys(element)) {
-      const found = findLiveVideoId(element[key]);
+      const found = findLiveVideoId(element[key], depth + 1);
       if (found) return found;
     }
   }

@@ -161,7 +161,7 @@ export function App() {
           </div>
           {config.alerts.map((alert, index) => (
             <AlertEditor
-              key={index}
+              key={alert.id || index}
               index={index}
               alert={alert}
               onChange={(a) => updateAlert(index, a)}
