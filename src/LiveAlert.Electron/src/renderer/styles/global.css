@@ -226,3 +226,25 @@ body {
   border-radius: 6px;
   padding: 14px;
 }
+
+/* Import/Export */
+.io-section {
+  margin-top: 32px;
+}
+
+.io-section h2 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.io-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-io {
+  background: #252525;
+  color: #ccc;
+  border: 1px solid #444;
+  padding: 8px 20px;
+}

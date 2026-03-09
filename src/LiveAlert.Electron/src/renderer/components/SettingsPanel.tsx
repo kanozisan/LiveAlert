@@ -64,7 +64,8 @@ export function SettingsPanel({ options, onChange }: Props) {
             value={options.displayMode}
             onChange={(e) => update({ displayMode: e.target.value as any })}
           >
-            <option value="alarm">アラーム</option>
+            <option value="alarm">バンド表示</option>
+            <option value="notification">OS通知</option>
             <option value="manner">マナー</option>
             <option value="off">オフ</option>
           </select>

@@ -14,6 +14,8 @@ declare global {
       hideOverlay: () => Promise<void>;
       stopAlert: () => Promise<void>;
       testAlert: () => Promise<void>;
+      exportConfig: () => Promise<{ success: boolean; error?: string }>;
+      importConfig: () => Promise<{ success: boolean; config?: string; error?: string }>;
       onTestAlert: (cb: () => void) => () => void;
       onStatusUpdate: (cb: (data: any) => void) => () => void;
       onPlayAudio: (cb: (data: any) => void) => () => void;
@@ -115,6 +117,20 @@ export function App() {
     saveConfig({ ...config, alerts });
   }, [config, saveConfig]);
 
+  const handleExport = useCallback(async () => {
+    const result = await window.electronAPI.exportConfig();
+    if (result.error) alert(`エクスポート失敗: ${result.error}`);
+  }, []);
+
+  const handleImport = useCallback(async () => {
+    const result = await window.electronAPI.importConfig();
+    if (result.error) {
+      alert(`インポート失敗: ${result.error}`);
+    } else if (result.success && result.config) {
+      try { setConfig(JSON.parse(result.config)); } catch { /* ignore */ }
+    }
+  }, []);
+
   if (!loaded) {
     return <div className="app loading">読み込み中...</div>;
   }
@@ -163,6 +179,14 @@ export function App() {
             options={config.options}
             onChange={(options) => saveConfig({ ...config, options })}
           />
+        </section>
+
+        <section className="io-section">
+          <h2>設定の管理</h2>
+          <div className="io-buttons">
+            <button className="btn btn-io" onClick={handleExport}>エクスポート</button>
+            <button className="btn btn-io" onClick={handleImport}>インポート</button>
+          </div>
         </section>
       </main>
     </div>

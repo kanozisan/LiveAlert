@@ -28,7 +28,7 @@ export interface AlertOptions {
   bandHeightPx: number;
   hotReload: boolean;
   notificationMode: 'alarm' | 'manner' | 'off';
-  displayMode: 'alarm' | 'manner' | 'off';
+  displayMode: 'alarm' | 'notification' | 'manner' | 'off';
   audioMode: 'alarm' | 'manner' | 'off';
   loopIntervalSec: number;
   dedupeMinutes: number;

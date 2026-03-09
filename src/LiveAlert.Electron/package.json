@@ -1,6 +1,7 @@
 {
   "name": "livealert",
   "version": "0.1.0",
+  "productName": "LiveAlert",
   "description": "YouTube Live & X Space detection alert app",
   "main": "dist/main/index.js",
   "type": "commonjs",
