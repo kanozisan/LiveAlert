@@ -34,7 +34,6 @@ export function AlertEditor({ index, alert, onChange, onDelete }: Props) {
             <label>サービス</label>
             <select value={alert.service || 'youtube'} onChange={(e) => update({ service: e.target.value })}>
               <option value="youtube">YouTube</option>
-              <option value="x_space">X Space</option>
             </select>
           </div>
 
@@ -68,7 +67,7 @@ export function AlertEditor({ index, alert, onChange, onDelete }: Props) {
             />
           </div>
 
-          {alert.service === 'x_space' && (
+          {false && (
             <div className="form-group">
               <label>タイトル含む文字列</label>
               <input
