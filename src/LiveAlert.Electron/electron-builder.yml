@@ -5,7 +5,9 @@ directories:
 files:
   - dist/**/*
   - assets/**/*
-  - resources/**/*
+extraResources:
+  - from: resources/
+    to: resources/
 mac:
   category: public.app-category.utilities
   target:

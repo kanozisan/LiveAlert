@@ -1,1 +1,0 @@
-../../assets/readme_android.txt

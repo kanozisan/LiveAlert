@@ -85,8 +85,20 @@ function createMainWindow(): void {
     if (!(app as any).isQuitting) {
       e.preventDefault();
       mainWindow?.hide();
+      // Hide from Dock when window is closed (macOS menu bar app pattern)
+      if (process.platform === 'darwin') {
+        app.dock?.hide();
+      }
     }
   });
+}
+
+function showMainWindow(): void {
+  if (process.platform === 'darwin') {
+    app.dock?.show();
+  }
+  mainWindow?.show();
+  mainWindow?.focus();
 }
 
 function createOverlayWindow(bandHeightPx: number, bandPosition: string): BrowserWindow {
@@ -137,18 +149,26 @@ function createOverlayWindow(bandHeightPx: number, bandPosition: string): Browse
 }
 
 function createTray(): void {
-  const iconPath = path.join(getAssetsPath(), '..', 'resources', 'tray-icon.png');
+  // macOS: "Template" suffix enables automatic dark/light mode adaptation
+  const resourcesDir = isDev
+    ? path.resolve(__dirname, '../../resources')
+    : path.join(process.resourcesPath, 'resources');
+  const iconPath = path.join(resourcesDir, 'tray-iconTemplate.png');
+  const icon2xPath = path.join(resourcesDir, 'tray-iconTemplate@2x.png');
+
   let icon: Electron.NativeImage;
   if (fs.existsSync(iconPath)) {
     icon = nativeImage.createFromPath(iconPath);
+    icon.setTemplateImage(true);
   } else {
-    icon = nativeImage.createEmpty();
+    // Fallback: "LA" text icon
+    icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAQ0lEQVQ4T2NkoBAwUqifAacBjP8ZGP4zMDL8Z2RkYPj/n+E/AwMDIwMjA+P//wyM/xkYGBn/MzD+Z2T8D1IHAMV+FAIAb6oOEYDsWkgAAAAASUVORK5CYII=');
   }
 
-  tray = new Tray(icon.isEmpty() ? nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAADklEQVQ4jWNgGAWDEwAAAhAAARZNEMEAAAAASUVORK5CYII=') : icon);
+  tray = new Tray(icon);
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: '設定を開く', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    { label: '設定を開く', click: () => { showMainWindow(); } },
     { label: 'テストアラート', click: () => triggerTestAlert() },
     { label: 'アラート停止', click: () => stopCurrentAlert(false) },
     { type: 'separator' },
@@ -160,8 +180,7 @@ function createTray(): void {
   tray.setToolTip('LiveAlert - 監視中');
   tray.setContextMenu(contextMenu);
   tray.on('double-click', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
+    showMainWindow();
   });
 }
 
@@ -430,7 +449,7 @@ app.on('activate', () => {
   if (mainWindow === null) {
     createMainWindow();
   } else {
-    mainWindow.show();
+    showMainWindow();
   }
 });
 
