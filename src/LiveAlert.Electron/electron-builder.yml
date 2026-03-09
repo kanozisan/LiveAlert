@@ -11,9 +11,7 @@ extraResources:
 mac:
   category: public.app-category.utilities
   target:
-    - dmg
     - zip
 win:
   target:
-    - nsis
     - zip
