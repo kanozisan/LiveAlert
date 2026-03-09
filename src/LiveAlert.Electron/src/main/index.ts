@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, dialog, Notification } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { AlertMonitor, AlertEvent, MonitoringSummary, MonitoringFailure } from '../core/alert-monitor';
@@ -10,6 +10,7 @@ let overlayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 
 const isDev = !app.isPackaged;
+app.setName('LiveAlert');
 
 // --- State ---
 let currentConfig: ConfigRoot = createDefaultConfig();
@@ -196,6 +197,19 @@ function showOverlay(item: AlertQueueItem): void {
   overlayWindow.show();
 }
 
+function showOSNotification(item: AlertQueueItem): void {
+  const message = item.alert.message.replace('{label}', item.alert.label);
+  const notification = new Notification({
+    title: 'LiveAlert',
+    body: message,
+    silent: false,
+  });
+  notification.on('click', () => {
+    stopCurrentAlert(true);
+  });
+  notification.show();
+}
+
 function stopCurrentAlert(openTarget: boolean): void {
   if (autoStopTimer) {
     clearTimeout(autoStopTimer);
@@ -241,8 +255,11 @@ function processQueue(): void {
     bgmVolume: next.alert.bgmVolume,
   });
 
-  // Show overlay if display mode allows
-  if (currentConfig.options.displayMode !== 'off') {
+  // Show alert based on display mode
+  const displayMode = currentConfig.options.displayMode;
+  if (displayMode === 'notification') {
+    showOSNotification(next);
+  } else if (displayMode !== 'off') {
     showOverlay(next);
   }
 
@@ -353,6 +370,44 @@ ipcMain.handle('stop-alert', async () => {
 
 ipcMain.handle('test-alert', async () => {
   triggerTestAlert();
+});
+
+// --- Config import/export ---
+ipcMain.handle('export-config', async () => {
+  const result = await dialog.showSaveDialog(mainWindow!, {
+    title: '設定のエクスポート',
+    defaultPath: 'config.json',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (result.canceled || !result.filePath) return { success: false };
+  try {
+    const configJson = fs.readFileSync(getConfigPath(), 'utf-8');
+    fs.writeFileSync(result.filePath, configJson, 'utf-8');
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('import-config', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: '設定のインポート',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return { success: false };
+  try {
+    const json = fs.readFileSync(result.filePaths[0], 'utf-8');
+    const parsed = JSON.parse(json);
+    if (!parsed.alerts || !parsed.options) {
+      return { success: false, error: '無効な設定ファイルです' };
+    }
+    fs.writeFileSync(getConfigPath(), json, 'utf-8');
+    currentConfig = parsed as ConfigRoot;
+    return { success: true, config: json };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
 });
 
 // --- App lifecycle ---

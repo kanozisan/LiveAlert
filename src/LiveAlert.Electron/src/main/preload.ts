@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   hideOverlay: () => ipcRenderer.invoke('hide-overlay'),
   stopAlert: () => ipcRenderer.invoke('stop-alert'),
   testAlert: () => ipcRenderer.invoke('test-alert'),
+  exportConfig: () => ipcRenderer.invoke('export-config'),
+  importConfig: () => ipcRenderer.invoke('import-config'),
 
   onTestAlert: (callback: () => void) => {
     ipcRenderer.on('test-alert', () => callback());

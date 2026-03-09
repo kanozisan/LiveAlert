@@ -1,0 +1,1 @@
+../../assets/assets_readme.txt
